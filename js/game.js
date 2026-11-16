@@ -25,8 +25,10 @@
   const crashOverlay = document.getElementById("crash-overlay");
   const crashOsdCanvas = document.getElementById("crash-osd-canvas");
   const restartBtn = document.getElementById("restart-btn");
-  const touchLeftEl = document.getElementById("touch-left");
-  const touchRightEl = document.getElementById("touch-right");
+
+  const hasCoarsePointer = Boolean(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+  const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || "");
+  let isTouchDevice = hasCoarsePointer || isMobileUA || (("ontouchstart" in window) && navigator.maxTouchPoints > 0 && window.innerWidth <= 1024);
 
   // === RENDERER ===
   const renderer = new THREE.WebGLRenderer({
@@ -110,7 +112,7 @@
   const osd = new window.HorrorVhsOsd.VcrOsdRenderer();
   const audio = new window.HorrorAudio.AudioEngine();
   const textures = window.HorrorTextures.buildAll();
-  const world = new window.HorrorWorld.WorldManager(scene, textures);
+  const world = new window.HorrorWorld.WorldManager(scene, textures, { mobile: isTouchDevice });
 
   // === CUTSCENE PROPS (Realistic 3D Handheld Flashlight + Classic Black Monster!) ===
   const flashlightProp = world.createFlashlightProp();
@@ -231,23 +233,22 @@
     rtCamModeFlag = Boolean(isCamOn);
     const w = Math.max(320, rootEl.clientWidth || window.innerWidth);
     const h = Math.max(200, rootEl.clientHeight || window.innerHeight);
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    const dpr = Math.min(window.devicePixelRatio || 1, isTouchDevice ? 1.0 : 1.5);
     const aspect = w / h;
     if (rtCamModeFlag) {
-      const rtH = 380;
-      const rtW = Math.max(320, Math.round(rtH * aspect));
+      const rtH = isTouchDevice ? 300 : 380;
+      const rtW = Math.max(300, Math.round(rtH * aspect));
       vhsRT.setSize(rtW, rtH);
     } else {
-      const rtH = Math.min(720, Math.max(480, Math.round(h * dpr)));
-      const rtW = Math.min(1280, Math.max(640, Math.round(rtH * aspect)));
+      const maxH = isTouchDevice ? 540 : 720;
+      const minH = isTouchDevice ? 360 : 480;
+      const rtH = Math.min(maxH, Math.max(minH, Math.round(h * dpr)));
+      const rtW = Math.min(isTouchDevice ? 960 : 1280, Math.max(540, Math.round(rtH * aspect)));
       vhsRT.setSize(rtW, rtH);
     }
     lastRtCamOn = rtCamModeFlag;
   }
 
-  const hasCoarsePointer = Boolean(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
-  const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || "");
-  let isTouchDevice = hasCoarsePointer || isMobileUA || (("ontouchstart" in window) && navigator.maxTouchPoints > 0 && window.innerWidth <= 1024);
   let portraitLocked = false;
   let touchLeft = false;
   let touchRight = false;
@@ -271,8 +272,6 @@
         keys.right = false;
         touchLeft = false;
         touchRight = false;
-        if (touchLeftEl) touchLeftEl.classList.remove("active");
-        if (touchRightEl) touchRightEl.classList.remove("active");
         audio.setTabHidden(true);
       } else {
         audio.setTabHidden(document.hidden);
@@ -303,7 +302,7 @@
     updateOrientationLock();
     const w = Math.max(320, rootEl.clientWidth || window.innerWidth);
     const h = Math.max(200, rootEl.clientHeight || window.innerHeight);
-    const dpr = Math.min(window.devicePixelRatio || 1, isTouchDevice ? 1.35 : 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, isTouchDevice ? 1.0 : 2);
 
     renderer.setPixelRatio(dpr);
     renderer.setSize(w, h, false);
@@ -472,8 +471,6 @@
     keys.right = false;
     touchLeft = false;
     touchRight = false;
-    if (touchLeftEl) touchLeftEl.classList.remove("active");
-    if (touchRightEl) touchRightEl.classList.remove("active");
   });
 
   document.addEventListener("visibilitychange", () => {
@@ -484,8 +481,6 @@
     if (portraitLocked) {
       touchLeft = false;
       touchRight = false;
-      if (touchLeftEl) touchLeftEl.classList.remove("active");
-      if (touchRightEl) touchRightEl.classList.remove("active");
       return;
     }
     const w = Math.max(1, window.innerWidth);
@@ -499,8 +494,6 @@
     }
     touchLeft = left;
     touchRight = right;
-    if (touchLeftEl) touchLeftEl.classList.toggle("active", left);
-    if (touchRightEl) touchRightEl.classList.toggle("active", right);
   }
 
   rootEl.addEventListener("touchstart", (e) => {
@@ -2289,6 +2282,14 @@
     if (state.camcorderOn) {
       osd.update(state.runClock, state.battery, state.distance, state.afBlur, state.nightVisionOn);
     }
+
+    const desiredFar = (isTouchDevice && state.mode === "run" && state.distance < 2750) ? 52.0 : 96.0;
+    if (camera.far !== desiredFar) {
+      camera.far = desiredFar;
+      camera.updateProjectionMatrix();
+    }
+    flashOuterSpot.visible = flashOuterSpot.intensity > 0.001;
+    camSpill.visible = camSpill.intensity > 0.001;
 
     scene.background.copy(scene.fog.color);
     renderer.setRenderTarget(vhsRT);

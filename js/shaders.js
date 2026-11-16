@@ -132,12 +132,8 @@ window.HorrorShaders = {
       float horrorSkew = uHorrorGlitch * (noise1(scanLineIdx * 1.3 + uTime * 90.0) - 0.5) * 0.085;
       float tearShift = tearMask * (noise1(scanLineIdx * 0.9 + uTime * 55.0) - 0.5) * 0.045 + horrorSkew;
 
-      // Authentic VHS Bottom Head-Switching Seam (bottom 2.8% of frame!)
-      float headSwitchMask = smoothstep(0.032, 0.006, lensUv.y);
-      float headSwitchSkew = headSwitchMask * (0.018 + 0.014 * noise1(uTime * 45.0 + scanLineIdx));
-
       vec2 tapeUv = vec2(
-        lensUv.x + tbcJitter + interlaceComb + tearShift + headSwitchSkew,
+        lensUv.x + tbcJitter + interlaceComb + tearShift,
         lensUv.y
       );
 
@@ -213,7 +209,7 @@ window.HorrorShaders = {
       nightCol *= (1.0 - osdRightShadow);
       nightCol = mix(nightCol, osdChromaSmear, clamp(osdAlpha * 0.93, 0.0, 1.0));
 
-      // 6. MAGNETIC TAPE OXIDE DROPOUT STREAKS & HEAD-SWITCH STATIC
+      // 6. MAGNETIC TAPE OXIDE DROPOUT STREAKS
       float dropoutSeed = hash12(vec2(scanLineIdx, floor(uTime * 24.0)));
       float dropoutThresh = 0.9965 - lowBatt * 0.010 - uTrauma * 0.015;
       if (dropoutSeed > dropoutThresh) {
@@ -221,12 +217,6 @@ window.HorrorShaders = {
         float streakLen = 0.04 + 0.14 * fract(dropoutSeed * 17.3);
         float inStreak = step(streakX, lensUv.x) * smoothstep(streakX + streakLen, streakX, lensUv.x);
         nightCol = mix(nightCol, vec3(0.82, 0.88, 0.82), inStreak * 0.78);
-      }
-
-      // Bottom VHS head-switching snow/static
-      if (headSwitchMask > 0.01) {
-        float hsNoise = hash12(vec2(floor(lensUv.x * 320.0), floor(uTime * 60.0) + scanLineIdx));
-        nightCol = mix(nightCol, vec3(hsNoise * 0.55, hsNoise * 0.62, hsNoise * 0.55), headSwitchMask * 0.65);
       }
 
       // 7. CRT / LCD SCANLINES & ANALOG LUMA TAPE GRAIN

@@ -37,9 +37,14 @@ window.HorrorWorld = (function () {
   }
 
   class WorldManager {
-    constructor(scene, textures) {
+    constructor(scene, textures, opts = {}) {
       this.scene = scene;
       this.tex = textures;
+      this.mobilePerf = Boolean(opts && opts.mobile);
+      this.tilesXRadius = this.mobilePerf ? 1 : TILES_X_RADIUS;
+      this.tilesZAhead = this.mobilePerf ? 2 : TILES_Z_AHEAD;
+      this.tilesZBehind = TILES_Z_BEHIND;
+      this.terrainSegs = this.mobilePerf ? 12 : 20;
       this.tiles = new Map();
       this.pendingQueue = [];
       this.terrainPool = [];
@@ -48,7 +53,7 @@ window.HorrorWorld = (function () {
       this.time = 0;
 
       this._buildSharedAssets();
-      this._initTerrainPool(42);
+      this._initTerrainPool(this.mobilePerf ? 18 : 42);
       this._rebuildBiomeSequence();
     }
 
@@ -166,10 +171,10 @@ window.HorrorWorld = (function () {
       return { contact, kind: zone === 1 ? "hemp" : "corn", stalkCellZ, rowK, rowSide };
     }
 
-    // Exact barycentric height of the rendered 20x20 PlaneGeometry ground mesh at (wx, wz) —
+    // Exact barycentric height of the rendered PlaneGeometry ground mesh at (wx, wz) —
     // guarantees grass, ferns, reeds & crops sit 100.0% flush on the actual ground triangles (zero floating/sinking)!
     terrainSurfaceHeight(wx, wz) {
-      const segs = 20;
+      const segs = this.terrainSegs || 20;
       const cell = TILE_SIZE / segs;
       const cx = Math.floor(wx / TILE_SIZE);
       const cz = Math.floor(wz / TILE_SIZE);
@@ -199,11 +204,12 @@ window.HorrorWorld = (function () {
     }
 
     _initTerrainPool(count) {
+      const segs = this.terrainSegs || 20;
       for (let i = 0; i < count; i++) {
-        const geo = new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE, 20, 20);
+        const geo = new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE, segs, segs);
         geo.rotateX(-Math.PI / 2);
         const mesh = new THREE.Mesh(geo, this.matGround);
-        mesh.receiveShadow = true;
+        mesh.receiveShadow = !this.mobilePerf;
         this.terrainPool.push(mesh);
       }
     }
@@ -211,10 +217,11 @@ window.HorrorWorld = (function () {
     _acquireTerrainMesh(centerX, centerZ) {
       let mesh = this.terrainPool.pop();
       if (!mesh) {
-        const geo = new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE, 20, 20);
+        const segs = this.terrainSegs || 20;
+        const geo = new THREE.PlaneGeometry(TILE_SIZE, TILE_SIZE, segs, segs);
         geo.rotateX(-Math.PI / 2);
         mesh = new THREE.Mesh(geo, this.matGround);
-        mesh.receiveShadow = true;
+        mesh.receiveShadow = !this.mobilePerf;
       }
       const gp = mesh.geometry.attributes.position;
       for (let i = 0; i < gp.count; i++) {
@@ -907,9 +914,28 @@ window.HorrorWorld = (function () {
       return g;
     }
 
+    _worldMat(opts) {
+      if (!this.mobilePerf) {
+        return new THREE.MeshStandardMaterial(opts);
+      }
+      const lOpts = {};
+      if (opts.color !== undefined) lOpts.color = opts.color;
+      if (opts.map !== undefined) lOpts.map = opts.map;
+      if (opts.emissive !== undefined) lOpts.emissive = opts.emissive;
+      if (opts.alphaTest !== undefined) lOpts.alphaTest = opts.alphaTest;
+      if (opts.side !== undefined) lOpts.side = opts.side;
+      if (opts.polygonOffset !== undefined) lOpts.polygonOffset = opts.polygonOffset;
+      if (opts.polygonOffsetFactor !== undefined) lOpts.polygonOffsetFactor = opts.polygonOffsetFactor;
+      if (opts.polygonOffsetUnits !== undefined) lOpts.polygonOffsetUnits = opts.polygonOffsetUnits;
+      if (opts.transparent !== undefined) lOpts.transparent = opts.transparent;
+      if (opts.opacity !== undefined) lOpts.opacity = opts.opacity;
+      lOpts.fog = opts.fog !== undefined ? opts.fog : true;
+      return new THREE.MeshLambertMaterial(lOpts);
+    }
+
     _buildSharedAssets() {
-      // === MATERIALS (Zero dynamic PointLights -> ZERO shader recompilation freezes!) ===
-      this.matGround = new THREE.MeshStandardMaterial({
+      // === MATERIALS (Zero dynamic PointLights -> ZERO shader recompilation freezes! Mobile uses fast MeshLambertMaterial!) ===
+      this.matGround = this._worldMat({
         color: 0x6c7066,
         map: this.tex.groundMap,
         bumpMap: this.tex.groundBump,
@@ -918,7 +944,7 @@ window.HorrorWorld = (function () {
         metalness: 0.02
       });
 
-      this.matSwampWater = new THREE.MeshStandardMaterial({
+      this.matSwampWater = this._worldMat({
         color: 0x161f1a,
         roughness: 0.10,
         metalness: 0.65,
@@ -927,7 +953,7 @@ window.HorrorWorld = (function () {
         polygonOffsetUnits: -1
       });
 
-      this.matRoad = new THREE.MeshStandardMaterial({
+      this.matRoad = this._worldMat({
         map: this.tex.roadMap,
         roughness: 0.78,
         metalness: 0.06,
@@ -936,35 +962,35 @@ window.HorrorWorld = (function () {
         polygonOffsetUnits: -1
       });
 
-      this.matGrass = new THREE.MeshStandardMaterial({
+      this.matGrass = this._worldMat({
         map: this.tex.grassMap,
         alphaTest: 0.36,
         roughness: 0.88,
         side: THREE.DoubleSide
       });
 
-      this.matHemp = new THREE.MeshStandardMaterial({
+      this.matHemp = this._worldMat({
         map: this.tex.hempMap,
         alphaTest: 0.34,
         roughness: 0.82,
         side: THREE.DoubleSide
       });
 
-      this.matCorn = new THREE.MeshStandardMaterial({
+      this.matCorn = this._worldMat({
         map: this.tex.cornMap,
         alphaTest: 0.34,
         roughness: 0.84,
         side: THREE.DoubleSide
       });
 
-      this.matReed = new THREE.MeshStandardMaterial({
+      this.matReed = this._worldMat({
         map: this.tex.reedMap,
         alphaTest: 0.35,
         roughness: 0.86,
         side: THREE.DoubleSide
       });
 
-      this.matFern = new THREE.MeshStandardMaterial({
+      this.matFern = this._worldMat({
         color: 0x7e8874,
         map: this.tex.fernMap,
         alphaTest: 0.38,
@@ -972,38 +998,38 @@ window.HorrorWorld = (function () {
         side: THREE.DoubleSide
       });
 
-      this.matBough = new THREE.MeshStandardMaterial({
+      this.matBough = this._worldMat({
         map: this.tex.boughMap,
         alphaTest: 0.35,
         roughness: 0.88,
         side: THREE.DoubleSide
       });
 
-      this.matPine = new THREE.MeshStandardMaterial({
+      this.matPine = this._worldMat({
         map: this.tex.pineMap,
         bumpMap: this.tex.pineBump,
         bumpScale: 0.12,
         roughness: 0.90
       });
 
-      this.matCharred = new THREE.MeshStandardMaterial({
+      this.matCharred = this._worldMat({
         color: 0x1d1f1d,
         bumpMap: this.tex.pineBump,
         bumpScale: 0.16,
         roughness: 0.95
       });
 
-      this.matBirch = new THREE.MeshStandardMaterial({
+      this.matBirch = this._worldMat({
         map: this.tex.birchMap,
         roughness: 0.80
       });
 
-      this.matCabinFacade = new THREE.MeshStandardMaterial({
+      this.matCabinFacade = this._worldMat({
         map: this.tex.cabinWallMap,
         roughness: 0.86
       });
 
-      this.matChurchFacade = new THREE.MeshStandardMaterial({
+      this.matChurchFacade = this._worldMat({
         color: 0xd4d8ce,
         map: this.tex.churchWallMap,
         bumpMap: this.tex.groundBump,
@@ -1011,83 +1037,83 @@ window.HorrorWorld = (function () {
         roughness: 0.80
       });
 
-      this.matDomeMetal = new THREE.MeshStandardMaterial({
+      this.matDomeMetal = this._worldMat({
         color: 0xb8b286,
         map: this.tex.rustMap,
         roughness: 0.30,
         metalness: 0.45
       });
 
-      this.matHeliPaint = new THREE.MeshStandardMaterial({
+      this.matHeliPaint = this._worldMat({
         color: 0x627256,
         map: this.tex.rustMap,
         roughness: 0.56,
         metalness: 0.24
       });
 
-      this.matHeliBelly = new THREE.MeshStandardMaterial({
+      this.matHeliBelly = this._worldMat({
         color: 0x8ea0a6,
         map: this.tex.rustMap,
         roughness: 0.52,
         metalness: 0.22
       });
 
-      this.matVehicleGlass = new THREE.MeshStandardMaterial({
+      this.matVehicleGlass = this._worldMat({
         color: 0x131d21,
         roughness: 0.14,
         metalness: 0.78
       });
 
       this.matCarPaints = [
-        new THREE.MeshStandardMaterial({ color: 0x68302c, map: this.tex.rustMap, roughness: 0.48, metalness: 0.34 }), // Faded Soviet cherry
-        new THREE.MeshStandardMaterial({ color: 0x3b5566, map: this.tex.rustMap, roughness: 0.48, metalness: 0.34 }), // Weathered slate-blue
-        new THREE.MeshStandardMaterial({ color: 0x525f44, map: this.tex.rustMap, roughness: 0.58, metalness: 0.26 }), // UAZ military khaki
-        new THREE.MeshStandardMaterial({ color: 0x8d8b7e, map: this.tex.rustMap, roughness: 0.52, metalness: 0.30 })  // Aged beige-white
+        this._worldMat({ color: 0x68302c, map: this.tex.rustMap, roughness: 0.48, metalness: 0.34 }), // Faded Soviet cherry
+        this._worldMat({ color: 0x3b5566, map: this.tex.rustMap, roughness: 0.48, metalness: 0.34 }), // Weathered slate-blue
+        this._worldMat({ color: 0x525f44, map: this.tex.rustMap, roughness: 0.58, metalness: 0.26 }), // UAZ military khaki
+        this._worldMat({ color: 0x8d8b7e, map: this.tex.rustMap, roughness: 0.52, metalness: 0.30 })  // Aged beige-white
       ];
 
-      this.matHeliRotorDark = new THREE.MeshStandardMaterial({
+      this.matHeliRotorDark = this._worldMat({
         color: 0x222824,
         roughness: 0.62,
         metalness: 0.28
       });
 
-      this.matNightmareFlesh = new THREE.MeshStandardMaterial({
+      this.matNightmareFlesh = this._worldMat({
         color: 0x26382b,
         emissive: 0x060d08,
         roughness: 0.52
       });
 
-      this.matBarnWood = new THREE.MeshStandardMaterial({
+      this.matBarnWood = this._worldMat({
         map: this.tex.barnPlankMap,
         roughness: 0.86
       });
 
-      this.matRoof = new THREE.MeshStandardMaterial({
+      this.matRoof = this._worldMat({
         map: this.tex.roofMap,
         roughness: 0.72,
         metalness: 0.25
       });
 
-      this.matRust = new THREE.MeshStandardMaterial({
+      this.matRust = this._worldMat({
         map: this.tex.rustMap,
         roughness: 0.58,
         metalness: 0.48
       });
 
-      this.matSteelRail = new THREE.MeshStandardMaterial({
+      this.matSteelRail = this._worldMat({
         color: 0x9aa49e,
         roughness: 0.28,
         metalness: 0.82
       });
 
-      this.matStone = new THREE.MeshStandardMaterial({
+      this.matStone = this._worldMat({
         color: 0x787c76,
         bumpMap: this.tex.groundBump,
         bumpScale: 0.08,
         roughness: 0.86
       });
 
-      this.matHay = new THREE.MeshStandardMaterial({
+      this.matHay = this._worldMat({
         color: 0x7a6d44,
         bumpMap: this.tex.pineBump,
         bumpScale: 0.12,
@@ -1102,7 +1128,7 @@ window.HorrorWorld = (function () {
       });
       this.matMonsterMaw = new THREE.MeshBasicMaterial({ color: 0x000000, fog: true });
       this.matMonsterTeeth = new THREE.MeshBasicMaterial({ color: 0xe2dccb, fog: true });
-      this.matReflector = new THREE.MeshStandardMaterial({
+      this.matReflector = this._worldMat({
         color: 0xdce4d8,
         emissive: 0x262e26,
         roughness: 0.2
@@ -2920,8 +2946,8 @@ window.HorrorWorld = (function () {
       const curCz = Math.floor(playerZ / TILE_SIZE);
 
       const needed = new Set();
-      for (let cz = curCz + TILES_Z_BEHIND; cz >= curCz - TILES_Z_AHEAD; cz--) {
-        for (let cx = curCx - TILES_X_RADIUS; cx <= curCx + TILES_X_RADIUS; cx++) {
+      for (let cz = curCz + this.tilesZBehind; cz >= curCz - this.tilesZAhead; cz--) {
+        for (let cx = curCx - this.tilesXRadius; cx <= curCx + this.tilesXRadius; cx++) {
           const key = `${cx},${cz}`;
           needed.add(key);
           if (!this.tiles.has(key) && !this.pendingQueue.some((q) => q.key === key)) {
@@ -2944,7 +2970,8 @@ window.HorrorWorld = (function () {
         }
       } else if (this.pendingQueue.length > 0) {
         this.pendingQueue.sort((a, b) => Math.hypot(a.cx - curCx, a.cz - curCz) - Math.hypot(b.cx - curCx, b.cz - curCz));
-        for (let q = 0; q < 2 && this.pendingQueue.length > 0; q++) {
+        const maxBuild = this.mobilePerf ? 1 : 2;
+        for (let q = 0; q < maxBuild && this.pendingQueue.length > 0; q++) {
           const item = this.pendingQueue.shift();
           if (needed.has(item.key) && !this.tiles.has(item.key)) this._spawnTile(item.cx, item.cz, item.key);
         }
@@ -3967,13 +3994,14 @@ window.HorrorWorld = (function () {
     _populateRowField(group, wx0, wz0, centerX, centerZ, rand, geo, mat, avoidObs) {
       const kStart = Math.ceil(wx0 / ROW_SPACING);
       const kEnd = Math.floor((wx0 + TILE_SIZE) / ROW_SPACING);
-      const zStep = 1.25; // Tight spacing along each row!
+      const zStep = this.mobilePerf ? 1.72 : 1.25; // Tight spacing along each row!
       const zCount = Math.floor(TILE_SIZE / zCountSafe(zStep));
       function zCountSafe(s) { return s; }
 
       const maxInstances = (kEnd - kStart + 2) * (zCount + 2);
       const im = new THREE.InstancedMesh(geo, mat, maxInstances);
       const dummy = new THREE.Object3D();
+      const scaleBoost = this.mobilePerf ? 1.12 : 1.0;
       let placed = 0;
 
       for (let k = kStart; k <= kEnd; k++) {
@@ -3998,7 +4026,7 @@ window.HorrorWorld = (function () {
 
           dummy.position.set(wx - centerX, this.terrainSurfaceHeight(wx, wz) - 0.03, wz - centerZ);
           dummy.rotation.set(0, rand() * Math.PI * 2, 0);
-          const sw = 0.88 + rand() * 0.28;
+          const sw = (0.88 + rand() * 0.28) * scaleBoost;
           const sh = 0.90 + rand() * 0.25;
           dummy.scale.set(sw, sh, sw);
           dummy.updateMatrix();
@@ -4091,18 +4119,20 @@ window.HorrorWorld = (function () {
     }
 
     _populateScattered(group, centerX, centerZ, rand, geo, mat, count, hScale) {
-      const im = new THREE.InstancedMesh(geo, mat, count);
+      const targetCount = this.mobilePerf ? Math.max(12, Math.round(count * 0.44)) : count;
+      const scaleBoost = this.mobilePerf ? 1.14 : 1.0;
+      const im = new THREE.InstancedMesh(geo, mat, targetCount);
       const dummy = new THREE.Object3D();
       const tileZone = this.zoneAt(centerX, centerZ);
       let placed = 0;
-      for (let i = 0; i < count; i++) {
+      for (let i = 0; i < targetCount; i++) {
         const wx = centerX + (rand() - 0.5) * TILE_SIZE;
         const wz = centerZ + (rand() - 0.5) * TILE_SIZE;
         if (tileZone !== 9 && this.isNearRoad(wx, wz, 3.5)) continue;
         dummy.position.set(wx - centerX, this.terrainSurfaceHeight(wx, wz) - 0.02, wz - centerZ);
         dummy.rotation.set(0, rand() * Math.PI * 2, 0);
-        const sw = 0.78 + rand() * 0.55;
-        const sh = (0.72 + rand() * 0.60) * hScale;
+        const sw = (0.78 + rand() * 0.55) * scaleBoost;
+        const sh = (0.72 + rand() * 0.60) * hScale * scaleBoost;
         dummy.scale.set(sw, sh, sw);
         dummy.updateMatrix();
         im.setMatrixAt(placed++, dummy.matrix);
