@@ -87,7 +87,7 @@ html, body {
 }
 
 #crash-overlay.ending-complete.visible {
-  transition: opacity 7.2s ease 0s;
+  transition: opacity 4.8s ease 0.8s;
 }
 
 #crash-box {

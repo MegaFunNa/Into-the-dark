@@ -410,6 +410,7 @@
       state.nightVisionOn = false;
     }
     state.blink = 0;
+    state.screenFade = 0.0;
     state.trauma = 0;
     state.horrorGlitch = 0;
     state.faceGlitchDur = 0;
@@ -587,6 +588,7 @@
     afBlur: 0,
     afTimer: 8.5,
     blink: 0.0,
+    screenFade: 0.0,
     camcorderOn: false,
     nightVisionOn: true,
     nvToggleTimer: 1.4,
@@ -659,6 +661,7 @@
     state.horrorGlitch = 0;
     state.afBlur = 0;
     state.blink = 0.85;
+    state.screenFade = 0.0;
     state.camcorderOn = false;
     state.nightVisionOn = true;
     state.nvToggleTimer = 1.4;
@@ -2045,9 +2048,10 @@
           audio.playBedroomLeftDoorKnock();
         }
 
-        // 6) ~1.40s after the knock starts (`bt = 13.35s -> 14.75s`), immediately start the long, slow 7s fade into the Drone Forest & titles!
+        // 6) ~1.40s after the knock starts (`bt = 13.35s -> 14.75s`), immediately start the smooth black cross-fade into the Drone Forest & titles!
         if (bt >= 14.75) {
-          state.blink = 1.0;
+          state.blink = 0.0;
+          state.screenFade = 1.0;
           state.mode = "end_menu";
           state.endMenuTime = 0;
           state.endGlitchTimer = 8.2 + Math.random() * 2.8;
@@ -2075,8 +2079,9 @@
       state.endMenuTime += dt;
       const et = state.endMenuTime;
 
-      // Long, gradual 6.8s atmospheric dissolve from darkness into the drone forest + `INTO THE DARK`!
-      state.blink = et < 0.20 ? 1.0 : (1.0 - smoothstep01(Math.min(1.0, (et - 0.20) / 6.80)));
+      // Pure smooth black fade-in (NO eyelid blink shape!) revealing the drone forest & `INTO THE DARK` titles
+      state.blink = 0.0;
+      state.screenFade = et < 0.25 ? 1.0 : (1.0 - smoothstep01(Math.min(1.0, (et - 0.25) / 5.5)));
       state.camcorderOn = false;
       state.nightVisionOn = false;
       vhsUniforms.uAfBlur.value = 0.0;
@@ -2344,8 +2349,12 @@
     renderer.setRenderTarget(null);
     renderer.render(postScene, postCam);
 
-    // Eyelid Blink / Death Eye-Close Overlay
+    // Eyelid Blink / Death Eye-Close Overlay + Fullscreen Fade
     window.HorrorShaders.drawEyelidBlink(blinkCtx, blinkCanvas.width, blinkCanvas.height, state.blink, state.trauma);
+    if (state.screenFade > 0.002) {
+      blinkCtx.fillStyle = "rgba(1, 2, 1, " + Math.min(1, state.screenFade).toFixed(3) + ")";
+      blinkCtx.fillRect(0, 0, blinkCanvas.width, blinkCanvas.height);
+    }
   }
 
   window.__DEBUG_GAME = { state, world, camera, audio, renderer, deathMonster, camcorderProp, endingHeli, startIntroCutscene, startDeathCutscene, startEndingCutscene, warpTo2950 };

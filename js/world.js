@@ -1202,9 +1202,9 @@ window.HorrorWorld = (function () {
       const c2 = new THREE.PlaneGeometry(1.45, 2.72); c2.translate(0, 1.34, 0); c2.rotateY(0.18 + Math.PI * 0.5);
       this.geoCornClump = this._mergeGeos([c1, c2]);
 
-      // Swamp Cattails / Reeds
-      const r1 = new THREE.PlaneGeometry(1.15, 2.15); r1.translate(0, 1.05, 0);
-      const r2 = new THREE.PlaneGeometry(1.15, 2.15); r2.translate(0, 1.05, 0); r2.rotateY(Math.PI * 0.5);
+      // Swamp Cattails / Reeds (Tall wild grass — scary above eye-level ~1.88m, leaving lanky_watcher's ~2.68m head clearly visible!)
+      const r1 = new THREE.PlaneGeometry(1.15, 1.88); r1.translate(0, 0.92, 0);
+      const r2 = new THREE.PlaneGeometry(1.15, 1.88); r2.translate(0, 0.92, 0); r2.rotateY(Math.PI * 0.5);
       this.geoReedClump = this._mergeGeos([r1, r2]);
 
       const fParts = [];
@@ -2668,13 +2668,13 @@ window.HorrorWorld = (function () {
       return { group, torso, head, armL, armR, legL, legR };
     }
 
-    // #4 «Длинный Наблюдатель» (2.45m bone-thin towering figure, dead-still posture & 75° tilting head)
+    // #4 «Длинный Наблюдатель» (2.68m bone-thin towering figure, dead-still posture & 75° tilting head — always visible above tall swamp grass!)
     createLankyWatcher(coatIdx = 0) {
       const group = new THREE.Group();
       const coatMat = this.matHumanCoats[coatIdx % this.matHumanCoats.length];
 
       const body = new THREE.Group();
-      body.scale.set(0.84, 1.30, 0.84);
+      body.scale.set(0.84, 1.45, 0.84);
 
       const legL = new THREE.Mesh(this.geoHuskLegL, this.matTrousers);
       legL.position.set(-0.11, 0.92, 0);
@@ -3496,17 +3496,23 @@ window.HorrorWorld = (function () {
       };
 
       const placeEnemyAt = (ex, ez, isNoCamExtra) => {
-        let kind = pickEnemyKind(isNoCamExtra);
-        if (kind === "contorted_strider") {
-          const ptZone = this.zoneAt(ex, ez);
-          // Never spawn oncoming runners inside tall hemp (1), tall corn (5), or tall swamp reeds (3 off-road)!
-          if (ptZone === 1 || ptZone === 5 || (ptZone === 3 && !this.isNearRoad(ex, ez, 4.0))) {
-            kind = pickStandardKind();
-          } else {
-            for (const other of enemies) {
-              if (other.kind === "contorted_strider" && (ex - other.wx) ** 2 + (ez - other.wz) ** 2 < 72.25) {
-                kind = pickStandardKind();
-                break;
+        const ptZone = this.zoneAt(ex, ez);
+        let kind;
+        // In tall non-row swamp grass (tile zone 3 OR point zone 3 off-road), spawn ONLY towering lanky_watcher so its head is clearly visible above the reeds!
+        if ((zone === 3 || ptZone === 3) && !this.isNearRoad(ex, ez, 4.0)) {
+          kind = "lanky_watcher";
+        } else {
+          kind = pickEnemyKind(isNoCamExtra);
+          if (kind === "contorted_strider") {
+            // Never spawn oncoming runners inside tall hemp (1), tall corn (5), or tall swamp reeds (3 off-road)!
+            if (ptZone === 1 || ptZone === 5 || (ptZone === 3 && !this.isNearRoad(ex, ez, 4.0))) {
+              kind = pickStandardKind();
+            } else {
+              for (const other of enemies) {
+                if (other.kind === "contorted_strider" && (ex - other.wx) ** 2 + (ez - other.wz) ** 2 < 72.25) {
+                  kind = pickStandardKind();
+                  break;
+                }
               }
             }
           }
@@ -3677,7 +3683,7 @@ window.HorrorWorld = (function () {
       }
 
       // 3. Rare Dormant #4 «Двойники-тени» (STRICTLY hidden & non-collidable unless battery is on 1 bar, rare so they don't spam!)
-      const shadowCount = rand() < 0.28 ? 1 : 0;
+      const shadowCount = (rand() < 0.28 && zone !== 3) ? 1 : 0;
       for (let k = 0; k < shadowCount; k++) {
         if (centerZ >= -28.0) break;
         const sz = wz0 + 4.5 + rand() * (TILE_SIZE - 9.0);
@@ -4121,6 +4127,7 @@ window.HorrorWorld = (function () {
     _populateScattered(group, centerX, centerZ, rand, geo, mat, count, hScale) {
       const targetCount = this.mobilePerf ? Math.max(12, Math.round(count * 0.44)) : count;
       const scaleBoost = this.mobilePerf ? 1.14 : 1.0;
+      const isReed = (geo === this.geoReedClump);
       const im = new THREE.InstancedMesh(geo, mat, targetCount);
       const dummy = new THREE.Object3D();
       const tileZone = this.zoneAt(centerX, centerZ);
@@ -4132,7 +4139,9 @@ window.HorrorWorld = (function () {
         dummy.position.set(wx - centerX, this.terrainSurfaceHeight(wx, wz) - 0.02, wz - centerZ);
         dummy.rotation.set(0, rand() * Math.PI * 2, 0);
         const sw = (0.78 + rand() * 0.55) * scaleBoost;
-        const sh = (0.72 + rand() * 0.60) * hScale * scaleBoost;
+        const sh = isReed
+          ? (0.78 + rand() * 0.27) * hScale
+          : (0.72 + rand() * 0.60) * hScale * scaleBoost;
         dummy.scale.set(sw, sh, sw);
         dummy.updateMatrix();
         im.setMatrixAt(placed++, dummy.matrix);
