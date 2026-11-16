@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Into The Dark — VHS Found Footage</title>
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <div id="game-root">
+    <!-- 3D WebGL Scene + Full Analog VHS Post-Processing & Embedded Pixel VCR OSD -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Flinch / Stumble Eyelid Overlay -->
+    <canvas id="blink-canvas"></canvas>
+
+    <!-- Minimal Start Hint (fades out after a few seconds) -->
+    <div id="controls-hint">
+      [A / D] ИЛИ [← / →] — УКЛОНЯТЬСЯ &nbsp;|&nbsp; ПОДБИРАЙТЕ ЯЩИКИ С СИГНАЛЬНОЙ ШАШКОЙ, ЧТОБЫ ПОЛУЧАТЬ БАТАРЕЙКИ
+    </div>
+
+    <!-- Minimal Atmospheric End-of-Game Screen -->
+    <div id="crash-overlay">
+      <div id="crash-box">
+        <div id="ending-title-wrap">
+          <div id="ending-title" data-text="INTO THE DARK">INTO THE DARK</div>
+        </div>
+        <button id="restart-btn" type="button">НАЧАТЬ ЗАНОВО</button>
+        <div id="crash-sub">
+          <canvas id="crash-osd-canvas" width="520" height="128" aria-label="Статистика забега"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Touch Zones (for Yandex Games mobile & tablet support) -->
+    <div id="touch-controls">
+      <div id="touch-left" class="touch-zone">◀</div>
+      <div id="touch-right" class="touch-zone">▶</div>
+    </div>
+
+    <!-- Mandatory Landscape Orientation Overlay for Mobile Devices -->
+    <div id="rotate-overlay" aria-hidden="true">
+      <div id="rotate-box">
+        <div id="rotate-icon">
+          <svg viewBox="0 0 64 64" width="56" height="56" fill="none" stroke="currentColor" stroke-width="2.5">
+            <rect x="20" y="10" width="24" height="44" rx="4" />
+            <circle cx="32" cy="48" r="1.8" fill="currentColor" stroke="none" />
+            <path d="M12 34 C9 22, 16 12, 26 9" stroke-linecap="round" />
+            <polyline points="22,6 27,9 23,13" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <div id="rotate-title">ПОВЕРНИТЕ ТЕЛЕФОН ГОРИЗОНТАЛЬНО</div>
+        <div id="rotate-sub">ДЛЯ ИГРЫ ОБЯЗАТЕЛЕН АЛЬБОМНЫЙ РЕЖИМ</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Local Standalone Scripts (Zero external CDN dependencies) -->
+  <script src="./lib/three.min.js"></script>
+  <script src="./js/vhs_osd.js"></script>
+  <script src="./js/shaders.js"></script>
+  <script src="./js/sfx_data.js"></script>
+  <script src="./js/audio.js"></script>
+  <script src="./js/textures.js"></script>
+  <script src="./js/world.js"></script>
+  <script src="./js/game.js"></script>
+</body>
+</html>
