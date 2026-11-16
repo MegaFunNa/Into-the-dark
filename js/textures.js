@@ -422,55 +422,99 @@ window.HorrorTextures = (function () {
       cwCtx.fillRect(wx, wy + wh * 0.42, ww, 4);
     }
 
-    // Peeling Whitewashed Brick Church Facade with Tall Arched Windows & Iron Bars!
-    const churchWall = makeCanvas(256, 256);
-    const chCtx = churchWall.getContext("2d");
-    chCtx.fillStyle = "#9e9c92";
-    chCtx.fillRect(0, 0, 256, 256);
+    // Peeling Weathered Brick & Plaster Town Hall Facade with Tall Old Windows!
+    const townhallWall = makeCanvas(256, 256);
+    const thCtx = townhallWall.getContext("2d");
+    thCtx.fillStyle = "#98968c";
+    thCtx.fillRect(0, 0, 256, 256);
     // Crumbled brick patches peeking through peeling plaster
     for (let p = 0; p < 38; p++) {
       const px = Math.random() * 220;
       const py = Math.random() * 220;
-      chCtx.fillStyle = Math.random() < 0.5 ? "rgba(76, 48, 38, 0.55)" : "rgba(58, 60, 54, 0.45)";
-      chCtx.fillRect(px, py, 14 + Math.random() * 28, 8 + Math.random() * 18);
+      thCtx.fillStyle = Math.random() < 0.5 ? "rgba(76, 48, 38, 0.55)" : "rgba(58, 60, 54, 0.45)";
+      thCtx.fillRect(px, py, 14 + Math.random() * 28, 8 + Math.random() * 18);
     }
     // Damp moss stains at bottom
-    const mossG = chCtx.createLinearGradient(0, 180, 0, 256);
+    const mossG = thCtx.createLinearGradient(0, 180, 0, 256);
     mossG.addColorStop(0, "rgba(25, 32, 22, 0)");
     mossG.addColorStop(1, "rgba(20, 28, 18, 0.85)");
-    chCtx.fillStyle = mossG;
-    chCtx.fillRect(0, 180, 256, 76);
-    // 3 Tall Gothic/Orthodox Arched Windows with wrought-iron grilles
+    thCtx.fillStyle = mossG;
+    thCtx.fillRect(0, 180, 256, 76);
+    // 3 Tall Municipal Rectangular Windows with stone lintels & broken muntins
     for (const ax of [46, 128, 210]) {
-      const ay = 108, aw = 34, ah = 92;
-      chCtx.fillStyle = "#bebcb0";
-      chCtx.beginPath();
-      chCtx.arc(ax, ay, aw * 0.62, Math.PI, 0);
-      chCtx.lineTo(ax + aw * 0.62, ay + ah);
-      chCtx.lineTo(ax - aw * 0.62, ay + ah);
-      chCtx.closePath();
-      chCtx.fill();
-
-      chCtx.fillStyle = "#070908";
-      chCtx.beginPath();
-      chCtx.arc(ax, ay, aw * 0.48, Math.PI, 0);
-      chCtx.lineTo(ax + aw * 0.48, ay + ah - 4);
-      chCtx.lineTo(ax - aw * 0.48, ay + ah - 4);
-      chCtx.closePath();
-      chCtx.fill();
-
-      // Iron bars inside arch
-      chCtx.strokeStyle = "#3a3d39";
-      chCtx.lineWidth = 2;
-      chCtx.beginPath();
-      chCtx.moveTo(ax, ay - aw * 0.46);
-      chCtx.lineTo(ax, ay + ah - 4);
-      chCtx.moveTo(ax - aw * 0.46, ay + 24);
-      chCtx.lineTo(ax + aw * 0.46, ay + 24);
-      chCtx.moveTo(ax - aw * 0.46, ay + 56);
-      chCtx.lineTo(ax + aw * 0.46, ay + 56);
-      chCtx.stroke();
+      const ay = 78, aw = 38, ah = 108;
+      thCtx.fillStyle = "#bebcb0";
+      thCtx.fillRect(ax - aw * 0.58, ay - 8, aw * 1.16, ah + 14);
+      thCtx.fillStyle = "#070908";
+      thCtx.fillRect(ax - aw * 0.46, ay, aw * 0.92, ah);
+      // Old window frame crossbars
+      thCtx.strokeStyle = "#3a3d39";
+      thCtx.lineWidth = 2;
+      thCtx.beginPath();
+      thCtx.moveTo(ax, ay);
+      thCtx.lineTo(ax, ay + ah);
+      thCtx.moveTo(ax - aw * 0.46, ay + 34);
+      thCtx.lineTo(ax + aw * 0.46, ay + 34);
+      thCtx.moveTo(ax - aw * 0.46, ay + 70);
+      thCtx.lineTo(ax + aw * 0.46, ay + 70);
+      thCtx.stroke();
     }
+
+    // Old Town Hall Tower Clock Face (weathered pale dial, dark tick marks, 11:55 hands!)
+    const clockFace = makeCanvas(256, 256);
+    const cfCtx = clockFace.getContext("2d");
+    cfCtx.fillStyle = "#1d201e";
+    cfCtx.fillRect(0, 0, 256, 256);
+    // Outer iron bezel
+    cfCtx.fillStyle = "#353936";
+    cfCtx.beginPath();
+    cfCtx.arc(128, 128, 122, 0, Math.PI * 2);
+    cfCtx.fill();
+    // Aged cream-white dial plate
+    const dialG = cfCtx.createRadialGradient(128, 128, 14, 128, 128, 110);
+    dialG.addColorStop(0, "#d2d0c2");
+    dialG.addColorStop(0.75, "#aeaca0");
+    dialG.addColorStop(1, "#6b6b62");
+    cfCtx.fillStyle = dialG;
+    cfCtx.beginPath();
+    cfCtx.arc(128, 128, 108, 0, Math.PI * 2);
+    cfCtx.fill();
+    // Cracks & soot grime
+    cfCtx.strokeStyle = "rgba(32, 30, 26, 0.42)";
+    cfCtx.lineWidth = 2;
+    cfCtx.beginPath();
+    cfCtx.moveTo(128, 128); cfCtx.lineTo(186, 52);
+    cfCtx.moveTo(128, 128); cfCtx.lineTo(56, 178);
+    cfCtx.stroke();
+    // 12 Hour Markers
+    for (let h = 0; h < 12; h++) {
+      const ang = (h / 12) * Math.PI * 2 - Math.PI * 0.5;
+      const rIn = (h % 3 === 0) ? 74 : 84;
+      const rOut = 98;
+      cfCtx.strokeStyle = "#161816";
+      cfCtx.lineWidth = (h % 3 === 0) ? 7 : 4;
+      cfCtx.beginPath();
+      cfCtx.moveTo(128 + Math.cos(ang) * rIn, 128 + Math.sin(ang) * rIn);
+      cfCtx.lineTo(128 + Math.cos(ang) * rOut, 128 + Math.sin(ang) * rOut);
+      cfCtx.stroke();
+    }
+    // Clock hands frozen right before midnight (~11:55)
+    cfCtx.strokeStyle = "#111311";
+    cfCtx.lineCap = "round";
+    cfCtx.lineWidth = 9;
+    cfCtx.beginPath();
+    cfCtx.moveTo(128, 128);
+    cfCtx.lineTo(128 - 18, 128 - 54);
+    cfCtx.stroke();
+    cfCtx.lineWidth = 6;
+    cfCtx.beginPath();
+    cfCtx.moveTo(128, 128);
+    cfCtx.lineTo(128 - 38, 128 - 76);
+    cfCtx.stroke();
+    cfCtx.fillStyle = "#181a18";
+    cfCtx.beginPath();
+    cfCtx.arc(128, 128, 9, 0, Math.PI * 2);
+    cfCtx.fill();
 
     // 9. BARN PLANKS, ROOF & ROAD & RUST
     const barnPlanks = makeCanvas(256, 256);
@@ -550,7 +594,8 @@ window.HorrorTextures = (function () {
       pineBump: toRepeatTex(pineBump, 2, 4),
       birchMap: toRepeatTex(birchCol, 1, 2),
       cabinWallMap: toClampTex(cabinWall),
-      churchWallMap: toClampTex(churchWall),
+      townhallWallMap: toClampTex(townhallWall),
+      clockFaceMap: toClampTex(clockFace),
       barnPlankMap: toRepeatTex(barnPlanks, 2, 1),
       roofMap: toRepeatTex(roofTex, 3, 2),
       roadMap: toRepeatTex(roadCol, 1, 3),

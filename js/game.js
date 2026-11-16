@@ -6,6 +6,9 @@
   let adShowing = false;
   let pausedByPlatform = false;
   let gameplayActive = false;
+  let windowBlurred = false;
+  let gameLanguage = "ru";
+  const shouldMute = () => document.hidden || windowBlurred || portraitLocked || adShowing || pausedByPlatform;
 
   function setGameplayActive(active) {
     const next = Boolean(active);
@@ -18,9 +21,26 @@
     } catch (e) {}
   }
 
-  function showDeathFullscreenAd() {
+  function restartWithFullscreenAd() {
+    if (adShowing || pausedByPlatform) return;
     setGameplayActive(false);
-    if (!ysdk || !ysdk.adv || typeof ysdk.adv.showFullscreenAdv !== "function" || adShowing) return;
+    if (!ysdk || !ysdk.adv || typeof ysdk.adv.showFullscreenAdv !== "function") {
+      startIntroCutscene();
+      return;
+    }
+    adShowing = true;
+    keys.left = false;
+    keys.right = false;
+    touchLeft = false;
+    touchRight = false;
+    let finished = false;
+    const finishAndRestart = () => {
+      if (finished) return;
+      finished = true;
+      adShowing = false;
+      audio.setTabHidden(shouldMute());
+      startIntroCutscene();
+    };
     try {
       ysdk.adv.showFullscreenAdv({
         callbacks: {
@@ -32,19 +52,12 @@
             touchRight = false;
             audio.setTabHidden(true);
           },
-          onClose: () => {
-            adShowing = false;
-            audio.setTabHidden(document.hidden || portraitLocked || pausedByPlatform);
-          },
-          onError: () => {
-            adShowing = false;
-            audio.setTabHidden(document.hidden || portraitLocked || pausedByPlatform);
-          }
+          onClose: finishAndRestart,
+          onError: finishAndRestart
         }
       });
     } catch (e) {
-      adShowing = false;
-      audio.setTabHidden(document.hidden || portraitLocked || pausedByPlatform);
+      finishAndRestart();
     }
   }
 
@@ -52,6 +65,9 @@
     window.YaGames.init()
       .then((sdk) => {
         ysdk = sdk;
+        const sdkLang = String(ysdk.environment?.i18n?.lang || "").toLowerCase().split(/[-_]/)[0];
+        gameLanguage = ["ru", "be", "kk", "uk", "uz"].includes(sdkLang) ? "ru" : "en";
+        applyLanguage();
         if (ysdk.features && ysdk.features.LoadingAPI) {
           ysdk.features.LoadingAPI.ready();
         }
@@ -67,7 +83,7 @@
           ysdk.on("game_api_resume", () => {
             pausedByPlatform = false;
             if (!adShowing) {
-              audio.setTabHidden(document.hidden || portraitLocked);
+              audio.setTabHidden(shouldMute());
             }
           });
         }
@@ -317,12 +333,21 @@
   let touchLeft = false;
   let touchRight = false;
 
+  function applyLanguage() {
+    const en = gameLanguage === "en";
+    document.documentElement.lang = gameLanguage;
+    document.title = en ? "Into The Dark — VHS Found Footage" : "Into The Dark — Запись на VHS";
+    if (hintEl) hintEl.textContent = isTouchDevice
+      ? (en ? "TAP LEFT OR RIGHT TO DODGE | PICK UP FLARE CRATES FOR BATTERIES" : "НАЖИМАЙТЕ НА ЛЕВУЮ ИЛИ ПРАВУЮ СТОРОНУ ЭКРАНА — УКЛОНЯТЬСЯ | ПОДБИРАЙТЕ ЯЩИКИ ДЛЯ БАТАРЕЕК")
+      : (en ? "[A / D] OR [← / →] — DODGE | PICK UP FLARE CRATES FOR BATTERIES" : "[A / D] ИЛИ [← / →] — УКЛОНЯТЬСЯ | ПОДБИРАЙТЕ ЯЩИКИ С СИГНАЛЬНОЙ ШАШКОЙ, ЧТОБЫ ПОЛУЧАТЬ БАТАРЕЙКИ");
+    if (restartBtn) restartBtn.textContent = en ? "PLAY AGAIN" : "НАЧАТЬ ЗАНОВО";
+    document.getElementById("rotate-title").textContent = en ? "ROTATE YOUR PHONE" : "ПОВЕРНИТЕ ТЕЛЕФОН ГОРИЗОНТАЛЬНО";
+    document.getElementById("rotate-sub").textContent = en ? "LANDSCAPE MODE IS REQUIRED" : "ДЛЯ ИГРЫ ОБЯЗАТЕЛЕН АЛЬБОМНЫЙ РЕЖИМ";
+    if (crashOsdCanvas) crashOsdCanvas.setAttribute("aria-label", en ? "Run statistics" : "Статистика забега");
+  }
   function applyTouchDeviceUI() {
-    if (!isTouchDevice) return;
-    document.body.classList.add("is-touch");
-    if (hintEl) {
-      hintEl.innerHTML = "НАЖИМАЙТЕ НА ЛЕВУЮ ИЛИ ПРАВУЮ СТОРОНУ ЭКРАНА — УКЛОНЯТЬСЯ &nbsp;|&nbsp; ПОДБИРАЙТЕ ЯЩИКИ ДЛЯ БАТАРЕЕК";
-    }
+    if (isTouchDevice) document.body.classList.add("is-touch");
+    applyLanguage();
   }
   applyTouchDeviceUI();
 
@@ -338,7 +363,7 @@
         touchRight = false;
         audio.setTabHidden(true);
       } else {
-        audio.setTabHidden(document.hidden);
+        audio.setTabHidden(shouldMute());
       }
     }
   }
@@ -394,9 +419,6 @@
     audio.unlock();
   }
 
-  let sevenStreakCount = 0;
-  let lastSevenTime = 0;
-
   const BEST_DIST_KEY = "into_the_dark_best_m";
   function loadBestDistance() {
     try {
@@ -414,18 +436,17 @@
       }
     } catch (e) {}
   }
-  function formatDistanceRu(meters) {
+  function formatDistance(meters) {
     const m = Math.max(0, Math.floor(meters));
     const kmStr = (m / 1000).toFixed(2);
-    return `${m} М (${kmStr} KM)`;
+    return `${m} ${gameLanguage === "en" ? "M" : "М"} (${kmStr} KM)`;
   }
   function updateCrashStatsUI(runDist, bestDist, isNewRecord) {
-    const distLine = `ПРОЙДЕНО: ${formatDistanceRu(runDist)}`;
-    const bestLine = isNewRecord
-      ? `НОВЫЙ РЕКОРД: ${formatDistanceRu(bestDist)}`
-      : `РЕКОРД: ${formatDistanceRu(bestDist)}`;
-    const tipLine = "ПОДБИРАЙТЕ ЯЩИКИ С СИГНАЛЬНОЙ ШАШКОЙ, ЧТОБЫ ПОЛУЧАТЬ БАТАРЕЙКИ";
-    const promptLine = "[ НАЖМИТЕ ПРОБЕЛ ИЛИ КОСНИТЕСЬ ЭКРАНА ]";
+    const en = gameLanguage === "en";
+    const distLine = `${en ? "DISTANCE" : "ПРОЙДЕНО"}: ${formatDistance(runDist)}`;
+    const bestLine = `${en ? (isNewRecord ? "NEW RECORD" : "BEST") : (isNewRecord ? "НОВЫЙ РЕКОРД" : "РЕКОРД")}: ${formatDistance(bestDist)}`;
+    const tipLine = en ? "PICK UP FLARE CRATES TO GET BATTERIES" : "ПОДБИРАЙТЕ ЯЩИКИ С СИГНАЛЬНОЙ ШАШКОЙ, ЧТОБЫ ПОЛУЧАТЬ БАТАРЕЙКИ";
+    const promptLine = en ? "[ PRESS SPACE OR TAP THE SCREEN ]" : "[ НАЖМИТЕ ПРОБЕЛ ИЛИ КОСНИТЕСЬ ЭКРАНА ]";
 
     if (crashOsdCanvas) {
       crashOsdCanvas.dataset.distText = distLine;
@@ -442,73 +463,8 @@
     }
   }
 
-  function warpTo2950() {
-    if (crashOverlay) crashOverlay.classList.remove("visible", "ending-complete");
-    state.mode = "run";
-    state.endedByGoal = false;
-    state.usedDebugWarp = true;
-    state.debugNoMonsters = true;
-    state.endingHeliPlaced = false;
-    state.endingInBedroom = false;
-    state.endingTime = 0;
-    state.monsterStumbleTimer = 0;
-    endingHeli.visible = false;
-    finaleHordeGroup.visible = false;
-    apartmentBedroom.group.visible = false;
-    introMonster.group.visible = false;
-    deathMonster.group.visible = false;
-    flashlightProp.visible = false;
-    camcorderProp.visible = false;
-    if (camcorderProp.userData && camcorderProp.userData.lcdMat) {
-      camcorderProp.userData.lcdMat.color.setHex(0x12261a);
-    }
-    if (state.battery <= 0.01) {
-      state.battery = 0.65;
-      state.camcorderThrown = false;
-    }
-    if (!state.camcorderThrown && state.battery > 0.001) {
-      state.camcorderOn = true;
-      state.nightVisionOn = true;
-    } else {
-      state.camcorderOn = false;
-      state.nightVisionOn = false;
-    }
-    state.blink = 0;
-    state.screenFade = 0.0;
-    state.trauma = 0;
-    state.horrorGlitch = 0;
-    state.faceGlitchDur = 0;
-    state.distance = 2950;
-    state.z = -2950;
-    state.x = world.roadCenterX(-2950);
-    state.y = world.terrainHeight(state.x, state.z) + EYE_HEIGHT;
-    state.vx = 0;
-    state.speed = MAX_SPEED;
-    world.update(state.x, state.z, 0.016, state.battery, null, true, true);
-    placeFinaleHelicopterAhead();
-  }
-
   window.addEventListener("keydown", (e) => {
     unlockAudioOnce();
-
-    // Quick test shortcut: pressing "777" three times in a row warps straight to 2,950m (50m before 3 km goal)!
-    if (!e.repeat) {
-      const isSeven = (e.code === "Digit7" || e.code === "Numpad7" || e.key === "7");
-      if (isSeven) {
-        const now = performance.now();
-        if (now - lastSevenTime > 2500) sevenStreakCount = 0;
-        sevenStreakCount++;
-        lastSevenTime = now;
-        if (sevenStreakCount >= 3) {
-          sevenStreakCount = 0;
-          warpTo2950();
-          e.preventDefault();
-          return;
-        }
-      } else {
-        sevenStreakCount = 0;
-      }
-    }
 
     if (state.mode === "gameover" && !state.endedByGoal && !e.repeat) {
       if (adShowing || pausedByPlatform) {
@@ -516,7 +472,7 @@
         return;
       }
       if (e.code === "Space" || e.code === "Enter" || e.code === "KeyR" || e.code === "KeyA" || e.code === "KeyD" || e.code === "ArrowLeft" || e.code === "ArrowRight") {
-        startIntroCutscene();
+        restartWithFullscreenAd();
         e.preventDefault();
         return;
       }
@@ -540,10 +496,16 @@
     keys.right = false;
     touchLeft = false;
     touchRight = false;
+    windowBlurred = true;
+    audio.setTabHidden(shouldMute());
+  });
+  window.addEventListener("focus", () => {
+    windowBlurred = false;
+    audio.setTabHidden(shouldMute());
   });
 
   document.addEventListener("visibilitychange", () => {
-    audio.setTabHidden(document.hidden || portraitLocked || adShowing || pausedByPlatform);
+    audio.setTabHidden(shouldMute());
   });
 
   function syncTouchesFromEvent(e) {
@@ -587,7 +549,7 @@
       }
       touchLeft = false;
       touchRight = false;
-      startIntroCutscene();
+      restartWithFullscreenAd();
       e.preventDefault();
       return;
     }
@@ -622,7 +584,7 @@
       e.stopPropagation();
       if (adShowing || pausedByPlatform) return;
       if (state.mode === "gameover" || state.mode === "end_menu") {
-        startIntroCutscene();
+        restartWithFullscreenAd();
       }
     });
   }
@@ -632,7 +594,7 @@
     unlockAudioOnce();
     if (adShowing || pausedByPlatform) return;
     if (e.pointerType !== "touch" && state.mode === "gameover" && !state.endedByGoal && !portraitLocked) {
-      startIntroCutscene();
+      restartWithFullscreenAd();
     }
   }, { passive: true });
 
@@ -651,7 +613,6 @@
     vx: 0,
     distance: 0,
     bestDistance: loadBestDistance(),
-    usedDebugWarp: false,
     runClock: 0,
     speed: BASE_SPEED,
     stepPhase: 0,
@@ -727,7 +688,6 @@
     state.y = world.terrainHeight(0, 3.5) + EYE_HEIGHT;
     state.vx = 0;
     state.distance = 0;
-    state.usedDebugWarp = false;
     state.runClock = 0;
     state.speed = 2.5;
     state.stepPhase = 0;
@@ -746,7 +706,6 @@
     state.faceGlitchDur = 0;
     state.faceGlitchPeak = 0;
     state.monsterStumbleTimer = 0;
-    state.debugNoMonsters = false;
     state.hintHidden = false;
     state.endingHeliPlaced = false;
     state.endingTime = 0;
@@ -1038,7 +997,7 @@
     state.mode = "ending";
     state.endedByGoal = true;
     state.distance = GOAL_DISTANCE;
-    if (!state.usedDebugWarp && GOAL_DISTANCE > state.bestDistance) {
+    if (GOAL_DISTANCE > state.bestDistance) {
       state.bestDistance = GOAL_DISTANCE;
       saveBestDistance(GOAL_DISTANCE);
     }
@@ -1102,7 +1061,7 @@
       state.afBlur = Math.max(state.afBlur, 0.35);
       state.wristRollVel += (relX > 0 ? -1 : 1) * 0.20;
     }
-    // Routine monster sightings (`infected_reveal`, `trance_snap`, `crows`, `chapel_bell`) NO LONGER glitch or blur the camera!
+    // Routine monster sightings (`infected_reveal`, `trance_snap`, `crows`, `clock_bell`) NO LONGER glitch or blur the camera!
   }
 
   function smoothstep01(t) {
@@ -1547,7 +1506,7 @@
         state.monsterStumbleTimer = Math.max(0, state.monsterStumbleTimer - dt);
       }
 
-      world.update(state.x, state.z, dt, state.battery, triggerHorrorEvent, false, Boolean(state.debugNoMonsters));
+      world.update(state.x, state.z, dt, state.battery, triggerHorrorEvent, false, false);
 
       state.trauma = Math.max(0, state.trauma - dt * 0.90);
       state.horrorGlitch = Math.max(0, state.horrorGlitch - dt * 1.45);
@@ -2354,7 +2313,7 @@
           state.mode = "gameover";
           const runM = Math.max(0, Math.floor(state.distance));
           let isNewRec = false;
-          if (!state.usedDebugWarp && runM > state.bestDistance) {
+          if (runM > state.bestDistance) {
             state.bestDistance = runM;
             saveBestDistance(runM);
             isNewRec = true;
@@ -2364,7 +2323,7 @@
             crashOverlay.classList.remove("ending-complete");
             crashOverlay.classList.add("visible");
           }
-          showDeathFullscreenAd();
+          setGameplayActive(false);
         }
       } else {
         let bVal = 0.0;
@@ -2434,7 +2393,6 @@
     }
   }
 
-  window.__DEBUG_GAME = { state, world, camera, audio, renderer, deathMonster, camcorderProp, endingHeli, startIntroCutscene, startDeathCutscene, startEndingCutscene, warpTo2950 };
 
   requestAnimationFrame(tick);
 })();

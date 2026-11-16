@@ -60,8 +60,8 @@ window.HorrorWorld = (function () {
     // Build a long non-repeating shuffled deck of all 9 biomes where fields are spaced far apart!
     _rebuildBiomeSequence() {
       const rand = mulberry32(this.runSeed + 555);
-      // 0:Taiga, 1:HempRows, 2:RailwayBoxcars, 3:DeadSwamp, 4:Sawmill, 5:CornRowsBarn, 6:HeliCrashHighway, 7:ScorchedWoods, 8:ChurchVillage
-      // Start: Taiga -> Railway -> HempRows -> ChurchVillage -> HeliCrashHighway -> DeadSwamp -> Sawmill -> CornRowsBarn -> ScorchedWoods
+      // 0:Taiga, 1:HempRows, 2:RailwayBoxcars, 3:DeadSwamp, 4:Sawmill, 5:CornRowsBarn, 6:HeliCrashHighway, 7:ScorchedWoods, 8:TownHallVillage
+      // Start: Taiga -> Railway -> HempRows -> TownHallVillage -> HeliCrashHighway -> DeadSwamp -> Sawmill -> CornRowsBarn -> ScorchedWoods
       this.biomeSequence = [0, 2, 1, 8, 6, 3, 4, 5, 7];
       // Append 40 more non-repeating shuffled chapters (fields 1 & 5 separated by at least 4 non-field zones!)
       const nonFields = [0, 2, 3, 4, 6, 7, 8];
@@ -276,23 +276,6 @@ window.HorrorWorld = (function () {
       if (rx) g.rotateX(rx);
       if (ry) g.rotateY(ry);
       if (rz) g.rotateZ(rz);
-      g.translate(x, y, z);
-      return g;
-    }
-
-    // Smooth curved Russian Orthodox Onion Dome (`луковичный купол`) via LatheGeometry!
-    _buildOnionDomeGeo(scaleR, scaleH, x, y, z) {
-      const profile = [
-        new THREE.Vector2(0.01, 0.0),
-        new THREE.Vector2(0.72 * scaleR, 0.05 * scaleH),
-        new THREE.Vector2(1.02 * scaleR, 0.34 * scaleH),
-        new THREE.Vector2(0.95 * scaleR, 0.62 * scaleH),
-        new THREE.Vector2(0.54 * scaleR, 0.92 * scaleH),
-        new THREE.Vector2(0.20 * scaleR, 1.22 * scaleH),
-        new THREE.Vector2(0.05 * scaleR, 1.52 * scaleH),
-        new THREE.Vector2(0.00, 1.65 * scaleH)
-      ];
-      const g = new THREE.LatheGeometry(profile, 18);
       g.translate(x, y, z);
       return g;
     }
@@ -1029,20 +1012,22 @@ window.HorrorWorld = (function () {
         roughness: 0.86
       });
 
-      this.matChurchFacade = this._worldMat({
+      this.matTownHallFacade = this._worldMat({
         color: 0xd4d8ce,
-        map: this.tex.churchWallMap,
+        map: this.tex.townhallWallMap,
         bumpMap: this.tex.groundBump,
         bumpScale: 0.06,
         roughness: 0.80
       });
 
-      this.matDomeMetal = this._worldMat({
+      this.matTownHallRoof = this._worldMat({
         color: 0xb8b286,
         map: this.tex.rustMap,
         roughness: 0.30,
         metalness: 0.45
       });
+
+      this.matClockFace = new THREE.MeshBasicMaterial({ map: this.tex.clockFaceMap, side: THREE.DoubleSide, color: 0xb0b4aa });
 
       this.matHeliPaint = this._worldMat({
         color: 0x627256,
@@ -1221,44 +1206,25 @@ window.HorrorWorld = (function () {
       this.geoBirchTree = this._buildTrunkGeo(10.2, 0.32, 6, 202);
       this.geoDeadTree = this._buildTrunkGeo(8.8, 0.40, 7, 303);
 
-      // HIGH-DETAIL OLD RUSSIAN STONE CHURCH WITH ONION DOMES & ARCHED BELLTOWER (`Храм с куполами-луковицами`!)
-      this.geoChurchStone = this._mergeGeos([
-        // Stone plinth foundation + front stairs
+      // Abandoned municipal hall with a square clock tower, no religious architecture.
+      this.geoTownHallStone = this._mergeGeos([
         this._box(6.4, 0.55, 8.6, 0, 0.275, 0),
         this._box(2.8, 0.36, 1.4, 0, 0.18, 4.85),
-        // Main sanctuary nave (`четверик`) + eastern semicircular apse (`алтарная апсида`)
-        this._box(5.8, 4.6, 5.8, 0, 2.85, -0.6),
-        this._cyl(2.1, 2.1, 3.8, 12, 0, 2.45, -3.75),
-        // Corner pilasters / buttresses (proud +0.12m -> zero Z-fighting!)
-        this._box(0.45, 4.7, 0.45, -2.92, 2.85,  2.32),
-        this._box(0.45, 4.7, 0.45,  2.92, 2.85,  2.32),
-        this._box(0.45, 4.7, 0.45, -2.92, 2.85, -3.52),
-        this._box(0.45, 4.7, 0.45,  2.92, 2.85, -3.52),
-        // Octagonal upper drum (`восьмерик`) rising above main nave!
-        this._cyl(1.85, 1.95, 2.55, 8, 0, 6.35, -0.6),
-        // Front Belltower (`колокольня`): lower vestibule + 4 open belfry pillars + upper drum!
-        this._box(3.4, 5.2, 3.2, 0, 3.10, 3.15),
-        this._box(0.48, 2.5, 0.48, -1.25, 6.90, 2.00),
-        this._box(0.48, 2.5, 0.48,  1.25, 6.90, 2.00),
-        this._box(0.48, 2.5, 0.48, -1.25, 6.90, 4.30),
-        this._box(0.48, 2.5, 0.48,  1.25, 6.90, 4.30),
-        this._cyl(1.45, 1.75, 1.25, 8, 0, 8.70, 3.15)
+        this._box(5.8, 4.6, 7.5, 0, 2.85, -0.2),
+        this._box(0.45, 4.7, 0.45, -2.92, 2.85, 3.45),
+        this._box(0.45, 4.7, 0.45,  2.92, 2.85, 3.45),
+        this._box(0.45, 4.7, 0.45, -2.92, 2.85, -3.85),
+        this._box(0.45, 4.7, 0.45,  2.92, 2.85, -3.85),
+        this._box(3.4, 8.6, 3.2, 0, 4.85, 2.65),
+        this._box(3.65, 0.24, 3.45, 0, 9.18, 2.65),
+        this._box(3.85, 0.22, 3.65, 0, 9.62, 2.65)
       ]);
-      this.geoChurchDomes = this._mergeGeos([
-        // Pitched nave cornice roofs
-        this._box(3.6, 0.14, 6.2, -1.55, 5.38, -0.6, 0, 0,  0.34),
-        this._box(3.6, 0.14, 6.2,  1.55, 5.38, -0.6, 0, 0, -0.34),
-        // Smooth LatheGeometry Main Onion Dome + Belltower Onion Dome + Hanging Bronze Bell + Orthodox Crosses!
-        this._buildOnionDomeGeo(1.75, 2.25, 0, 7.55, -0.6),
-        this._buildOnionDomeGeo(1.15, 1.65, 0, 9.28,  3.15),
-        this._cyl(0.18, 0.52, 0.72, 12, 0, 7.15, 3.15), // Hanging bronze bell inside open belfry!
-        // Tall wrought-iron Orthodox crosses atop both onion domes
-        this._cyl(0.035, 0.045, 1.85, 6, 0, 12.1, -0.6),
-        this._box(0.92, 0.06, 0.06, 0, 12.45, -0.6, 0, 0, 0.05),
-        this._box(0.48, 0.05, 0.05, 0, 11.65, -0.6, 0, 0, -0.35),
-        this._cyl(0.03, 0.04, 1.45, 6, 0, 12.6, 3.15),
-        this._box(0.72, 0.05, 0.05, 0, 12.9, 3.15)
+      this.geoTownHallRoof = this._mergeGeos([
+        this._box(3.6, 0.14, 7.8, -1.55, 5.38, -0.2, 0, 0, 0.34),
+        this._box(3.6, 0.14, 7.8, 1.55, 5.38, -0.2, 0, 0, -0.34),
+        this._box(3.95, 0.18, 3.75, 0, 9.75, 2.65)
       ]);
+      this.geoClockFace = new THREE.PlaneGeometry(2.35, 2.35);
 
       // HIGH-DETAIL COHESIVE SOVIET MI-8 CRASHED HELICOPTER + VAZ-2106 ZHIGULI & UAZ-452 BUKHANKA!
       this._buildDetailedHelicopterGeos();
@@ -1407,11 +1373,10 @@ window.HorrorWorld = (function () {
         this._box(0.36, 0.16, 0.06,  0.66, 0.68, -2.16)
       ]);
 
-      this.geoGraveCross = this._mergeGeos([
-        this._box(0.75, 0.45, 0.42, 0, 0.22, 0),
-        this._box(0.14, 2.25, 0.12, 0, 1.35, 0, 0, 0, 0.06),
-        this._box(1.10, 0.13, 0.12, 0, 1.88, 0.02, 0, 0, 0.06),
-        this._box(0.52, 0.09, 0.12, 0, 0.98, 0.02, 0, 0, -0.32)
+      this.geoGravestone = this._mergeGeos([
+        this._box(0.95, 0.32, 0.55, 0, 0.16, 0),
+        this._box(0.72, 1.25, 0.25, 0, 0.94, 0),
+        this._box(0.58, 0.14, 0.26, 0, 1.62, 0)
       ]);
 
       this.geoHayBale = this._cyl(0.88, 0.88, 1.55, 12, 0, 0.86, 0, 0, 0, Math.PI * 0.5);
@@ -3290,31 +3255,38 @@ window.HorrorWorld = (function () {
         foliageMesh = this._populateScattered(group, centerX, centerZ, rand, this.geoGrassTuft, this.matGrass, 140, 0.75);
 
       } else if (zone === 8) {
-        // === BIOME 8: DEAD VILLAGE & DETAILED ONION-DOME RUSSIAN STONE CHURCH (`Храм и погост`)! ===
+        // === BIOME 8: DEAD VILLAGE, ABANDONED TOWN HALL AND OLD TOMBSTONES ===
         const chZ = centerZ + (rand() - 0.5) * 8.0;
         const chX = hasRoad ? (this.roadCenterX(chZ) + (((Math.abs(cx + cz) % 2 === 0) ? 1 : -1) * 9.2)) : (centerX + (rand() - 0.5) * 10.0);
         if (Math.abs(chX - centerX) < TILE_SIZE * 0.46 && !isSpawnArea(chX, chZ)) {
           if (hasRoad || ((Math.abs(cx) + Math.abs(cz)) % 2 === 0)) {
-            // Detailed Stone Church with Onion Domes & Belltower!
-            const church = new THREE.Group();
-            church.userData.isChurch = true;
-            church.add(
-              new THREE.Mesh(this.geoChurchStone, this.matChurchFacade),
-              new THREE.Mesh(this.geoChurchDomes, this.matDomeMetal)
+            // Square civic clock tower, with large dials facing all four directions.
+            const townHall = new THREE.Group();
+            townHall.userData.isTownHall = true;
+            townHall.add(
+              new THREE.Mesh(this.geoTownHallStone, this.matTownHallFacade),
+              new THREE.Mesh(this.geoTownHallRoof, this.matTownHallRoof)
             );
-            church.position.set(chX - centerX, this.terrainHeight(chX, chZ) - 0.20, chZ - centerZ);
-            group.add(church);
+            for (let side = 0; side < 4; side++) {
+              const dial = new THREE.Mesh(this.geoClockFace, this.matClockFace);
+              dial.rotation.y = side * Math.PI / 2;
+              const radius = side % 2 ? 1.711 : 1.611;
+              dial.position.set(Math.sin(dial.rotation.y) * radius, 7.65, 2.65 + Math.cos(dial.rotation.y) * radius);
+              townHall.add(dial);
+            }
+            townHall.position.set(chX - centerX, this.terrainHeight(chX, chZ) - 0.20, chZ - centerZ);
+            group.add(townHall);
             obstacles.push({ type: "box", x: chX, z: chZ, hx: 3.1, hz: 4.3, yaw: 0, nearPlayed: false });
-            soundSpots.push({ kind: "chapel_bell", wx: chX, wz: chZ, range: 32.0, played: false });
+            soundSpots.push({ kind: "clock_bell", wx: chX, wz: chZ, range: 32.0, played: false });
 
-            // Surrounding cemetery crosses
+            // Surrounding crossless stone grave markers
             for (let g = 0; g < 6; g++) {
               const gx = chX + (rand() < 0.5 ? -1 : 1) * (4.8 + rand() * 5.0);
               const gz = chZ + (rand() - 0.5) * 12.0;
               if (Math.abs(gx - centerX) < 14.5 && !this.isNearRoad(gx, gz, 5.0) && !tooClose(gx, gz, 3.8)) {
-                const cross = new THREE.Mesh(this.geoGraveCross, this.matStone);
-                cross.position.set(gx - centerX, this.terrainHeight(gx, gz) - 0.08, gz - centerZ);
-                group.add(cross);
+                const stone = new THREE.Mesh(this.geoGravestone, this.matStone);
+                stone.position.set(gx - centerX, this.terrainHeight(gx, gz) - 0.08, gz - centerZ);
+                group.add(stone);
                 obstacles.push({ type: "circle", x: gx, z: gz, crashR: 0.25, grazeR: 0.48, nearR: 2.0, nearPlayed: false });
               }
             }
@@ -3334,7 +3306,7 @@ window.HorrorWorld = (function () {
           }
         }
 
-        // Keep trees clear of the church facade so the onion domes & belltower silhouette cleanly!
+        // Keep trees clear of the town hall and clock tower silhouette.
         this._populateTrees(group, centerX, centerZ, 6, 0.65, rand, obstacles, (tx, tz, r) => tooClose(tx, tz, Math.max(r, 8.2)), isSpawnArea, false, false);
         foliageMesh = this._populateScattered(group, centerX, centerZ, rand, this.geoGrassTuft, this.matGrass, 240, 0.95);
 
@@ -3659,7 +3631,7 @@ window.HorrorWorld = (function () {
         }
       }
 
-      // Top up any cells blocked by large structures (barns/churches) using global blue-noise scatter
+      // Top up any cells blocked by large structures (barns/town halls) using global blue-noise scatter
       const spawnBlueNoiseExtra = (isNoCamExtra) => {
         const gapReq = isNoCamExtra ? minEnemyGap * 0.86 : minEnemyGap;
         for (let attempt = 0; attempt < 24; attempt++) {

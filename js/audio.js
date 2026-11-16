@@ -607,7 +607,7 @@ window.HorrorAudio = (function () {
       if (!this.unlocked || this.mutedByTab) return;
       const valid = (
         kind === "stalker_vanish" || kind === "shadow_vanish" ||
-        kind === "crows" || kind === "chapel_bell" ||
+        kind === "crows" || kind === "clock_bell" ||
         kind === "trance_snap" || kind === "infected_weep" ||
         kind === "infected_reveal"
       );
@@ -643,8 +643,8 @@ window.HorrorAudio = (function () {
         this._playSample8D("whisper", azDeg, Math.max(0.32, atten * 0.56), 0.78, true);
       } else if (kind === "crows") {
         this._playSample8D("crows", azDeg, Math.max(0.35, atten * 0.85), 0.96 + Math.random() * 0.08, true);
-      } else if (kind === "chapel_bell") {
-        this._playSample8D("church_bell", azDeg, Math.max(0.32, atten * 0.88), 0.98, true);
+      } else if (kind === "clock_bell") {
+        this._playSample8D("clock_bell", azDeg, Math.max(0.32, atten * 0.88), 0.98, true);
       } else if (kind === "trance_snap") {
         // #1 «Ведомый»: eerie hollow exhale + heavy shuffling step as it snaps its head toward you
         this._playSample8D("breath_2", azDeg, Math.max(0.28, atten * 0.62), 0.76, true, 0, 1450);
