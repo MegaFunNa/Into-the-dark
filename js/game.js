@@ -711,7 +711,13 @@
     world.update(0, 3.5, 0.016, 1.0, null, true);
   }
 
-  function startDeathCutscene() {
+  function startDeathCutscene(crashCol = null) {
+    if (crashCol && crashCol.targetSafeX !== null && crashCol.targetSafeX !== undefined) {
+      state.x = crashCol.targetSafeX;
+    }
+    if (crashCol && crashCol.targetSafeZ !== null && crashCol.targetSafeZ !== undefined) {
+      state.z = crashCol.targetSafeZ;
+    }
     state.mode = "death";
     state.endedByGoal = false;
     // Keep camcorder briefly on for 0.15s during impact ONLY if we hadn't already thrown it away at 0% battery!
@@ -743,7 +749,7 @@
     audio.updateRunningLoop(false);
     if (hintEl) hintEl.style.opacity = "0";
 
-    // Pick whichever side (+1 right or -1 left) beside our fallen body has the clearest view free of tree trunks!
+    // Pick whichever side (+1 right or -1 left) beside our fallen body has the clearest view free of trunks & vehicles!
     const minClearanceForSide = (side) => {
       const testX = state.crashStartX + side * 1.55;
       const testZ = state.crashStartZ + 0.35;
@@ -751,7 +757,16 @@
       for (const tile of world.tiles.values()) {
         for (const ob of tile.obstacles) {
           if (ob.active === false) continue;
-          const d = Math.hypot(testX - ob.x, testZ - ob.z);
+          let d;
+          if (ob.type === "box") {
+            const cy = Math.cos(ob.yaw || 0), sy = Math.sin(ob.yaw || 0);
+            const rx = testX - ob.x, rz = testZ - ob.z;
+            const lx = Math.abs(rx * cy - rz * sy) - (ob.hx || 1.0);
+            const lz = Math.abs(rx * sy + rz * cy) - (ob.hz || 1.0);
+            d = Math.hypot(Math.max(0, lx), Math.max(0, lz));
+          } else {
+            d = Math.hypot(testX - ob.x, testZ - ob.z) - (ob.crashR || 0.3);
+          }
           if (d < minD) minD = d;
         }
       }
@@ -759,7 +774,9 @@
     };
     const clearR = minClearanceForSide(1);
     const clearL = minClearanceForSide(-1);
-    if (Math.abs(clearR - clearL) < 0.35) {
+    if (crashCol && crashCol.hitOb && crashCol.hitOb.type === "box" && Math.abs(state.crashStartX - crashCol.hitOb.x) > 0.35) {
+      state.deathSide = state.crashStartX >= crashCol.hitOb.x ? 1 : -1;
+    } else if (Math.abs(clearR - clearL) < 0.35) {
       state.deathSide = Math.random() < 0.5 ? 1 : -1;
     } else {
       state.deathSide = clearR >= clearL ? 1 : -1;
@@ -768,6 +785,18 @@
     // Physical resting position after rebounding off the obstacle and collapsing onto our side
     state.fallEndX = state.crashStartX + state.deathSide * 0.42;
     state.fallEndZ = state.crashStartZ + 1.12;
+    if (crashCol && crashCol.hitOb && crashCol.hitOb.type === "box") {
+      // Ensure rebound end position stays safely outside the vehicle/box hull
+      const ob = crashCol.hitOb;
+      const cy = Math.cos(ob.yaw || 0), sy = Math.sin(ob.yaw || 0);
+      const rx = state.fallEndX - ob.x, rz = state.fallEndZ - ob.z;
+      const lx = rx * cy - rz * sy, lz = rx * sy + rz * cy;
+      if (Math.abs(lx) < ob.hx + 0.32 && Math.abs(lz) < ob.hz + 0.32) {
+        const pushLx = (lx >= 0 ? 1 : -1) * (ob.hx + 0.42);
+        state.fallEndX = ob.x + pushLx * cy + lz * sy;
+        state.fallEndZ = ob.z - pushLx * sy + lz * cy;
+      }
+    }
     const endGroundY = world.terrainHeight(state.fallEndX, state.fallEndZ);
 
     // Standing tall & motionless beside us (`сбоку от нас`) staring down
@@ -1399,7 +1428,7 @@
         state.trauma = Math.min(1.0, state.trauma + 0.07);
       }
       if (col.hit === "crash") {
-        startDeathCutscene();
+        startDeathCutscene(col);
       } else if (col.hit === "monster_stumble") {
         // Authentic *Into the Dead* partial-shoulder monster stumble (`спотыкание как в оригинале`! Second clip within 3.2s = lethal!)
         if (col.targetSafeX !== null) {

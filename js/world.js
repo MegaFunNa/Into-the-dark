@@ -4194,8 +4194,8 @@ window.HorrorWorld = (function () {
           car.rotation.order = "YXZ";
           car.rotation.set(0, carYaw, (rand() - 0.5) * 0.05);
           group.add(car);
-          const carHx = variant === 1 ? 0.90 : 0.80;
-          const carHz = variant === 1 ? 2.12 : 2.02;
+          const carHx = variant === 1 ? 0.98 : 0.86;
+          const carHz = variant === 1 ? 2.26 : 2.10;
           obstacles.push({ type: "box", x: carX, z: carZ, hx: carHx, hz: carHz, yaw: carYaw, nearPlayed: false });
           if (rand() < 0.5) soundSpots.push({ kind: "radio_static", wx: carX, wz: carZ, range: 17.0, played: false });
         }
@@ -4285,10 +4285,11 @@ window.HorrorWorld = (function () {
             } else if (ob.type === "box") {
               const yaw = ob.yaw || 0;
               const cy = Math.cos(yaw), sy = Math.sin(yaw);
-              const coreHx = Math.max(0.10, ob.hx - 0.10);
-              const coreHz = Math.max(0.12, ob.hz - 0.12);
-              const grazeHx = ob.hx + 0.16;
-              const grazeHz = ob.hz + 0.16;
+              // Keep lethal box hull strictly OUTSIDE the outer metal/glass shell (> camera.near) so camera NEVER clips inside!
+              const coreHx = ob.hx + 0.10;
+              const coreHz = ob.hz + 0.10;
+              const grazeHx = ob.hx + 0.28;
+              const grazeHz = ob.hz + 0.24;
 
               for (const s of [0.25, 0.5, 0.75, 1.0]) {
                 const sx = prevX + segDx * s, sz = prevZ + segDz * s;
@@ -4302,27 +4303,36 @@ window.HorrorWorld = (function () {
                   res.nearMissPan = relX >= 0 ? -0.78 : 0.78;
                 }
 
-                if (ob._grazed) break;
+                // 1. Entering the solid vehicle/structure hull ALWAYS crashes (never let _grazed disable collision and allow walking through!)
+                if (Math.abs(lx) <= coreHx && Math.abs(lz) <= coreHz) {
+                  // Compute safe outer surface point pushed 0.20m clear of the shell so death camera never peeks inside!
+                  const penX = coreHx - Math.abs(lx);
+                  const penZ = coreHz - Math.abs(lz);
+                  let outLx = lx, outLz = lz;
+                  if (penX <= penZ) {
+                    outLx = (lx >= 0 ? 1 : -1) * (coreHx + 0.20);
+                  } else {
+                    outLz = (lz >= 0 ? 1 : -1) * (coreHz + 0.20);
+                  }
+                  const safeWx = ob.x + outLx * cy + outLz * sy;
+                  const safeWz = ob.z - outLx * sy + outLz * cy;
+                  return { hit: "crash", pushX: 0, pan: 0, nearMissPan: null, hitOb: ob, targetSafeX: safeWx, targetSafeZ: safeWz };
+                }
 
-                if (Math.abs(lx) <= grazeHx && Math.abs(lz) <= grazeHz) {
-                  const isSideOrCornerClip = (Math.abs(lx) > coreHx * 0.78) && (Math.abs(lx) > coreHx || Math.abs(lz) > coreHz);
-                  if (isSideOrCornerClip) {
-                    ob._grazed = true;
-                    const sideL = lx >= 0 ? 1 : -1;
-                    const safeLx = sideL * (grazeHx + 0.08);
-                    const safeWx = ob.x + safeLx * cy + lz * sy;
-                    const safeWz = ob.z - safeLx * sy + lz * cy;
-                    const pushSign = (safeWx - sx) >= 0 ? 1 : -1;
-                    res.hit = "graze";
-                    res.pushX = pushSign * 2.35;
-                    res.pan = relX >= 0 ? -0.78 : 0.78;
-                    res.targetSafeX = safeWx;
-                    res.targetSafeZ = safeWz;
-                    break;
-                  }
-                  if (Math.abs(lx) <= coreHx && Math.abs(lz) <= coreHz) {
-                    return { hit: "crash", pushX: 0, pan: 0, nearMissPan: null, hitOb: ob, targetSafeX: null, targetSafeZ: null };
-                  }
+                // 2. Survivable graze ONLY when brushing the outer flank (strictly outside coreHx, never on front/rear corners!)
+                if (!ob._grazed && Math.abs(lx) > coreHx && Math.abs(lx) <= grazeHx && Math.abs(lz) <= grazeHz) {
+                  ob._grazed = true;
+                  const sideL = lx >= 0 ? 1 : -1;
+                  const safeLx = sideL * (grazeHx + 0.08);
+                  const safeWx = ob.x + safeLx * cy + lz * sy;
+                  const safeWz = ob.z - safeLx * sy + lz * cy;
+                  const pushSign = (safeWx - sx) >= 0 ? 1 : -1;
+                  res.hit = "graze";
+                  res.pushX = pushSign * 2.35;
+                  res.pan = relX >= 0 ? -0.78 : 0.78;
+                  res.targetSafeX = safeWx;
+                  res.targetSafeZ = safeWz;
+                  break;
                 }
               }
             }
