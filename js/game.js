@@ -3,12 +3,76 @@
   "use strict";
 
   let ysdk = null;
+  let adShowing = false;
+  let pausedByPlatform = false;
+  let gameplayActive = false;
+
+  function setGameplayActive(active) {
+    const next = Boolean(active);
+    if (!ysdk || !ysdk.features || !ysdk.features.GameplayAPI) return;
+    if (next === gameplayActive) return;
+    gameplayActive = next;
+    try {
+      if (next) ysdk.features.GameplayAPI.start();
+      else ysdk.features.GameplayAPI.stop();
+    } catch (e) {}
+  }
+
+  function showDeathFullscreenAd() {
+    setGameplayActive(false);
+    if (!ysdk || !ysdk.adv || typeof ysdk.adv.showFullscreenAdv !== "function" || adShowing) return;
+    try {
+      ysdk.adv.showFullscreenAdv({
+        callbacks: {
+          onOpen: () => {
+            adShowing = true;
+            keys.left = false;
+            keys.right = false;
+            touchLeft = false;
+            touchRight = false;
+            audio.setTabHidden(true);
+          },
+          onClose: () => {
+            adShowing = false;
+            audio.setTabHidden(document.hidden || portraitLocked || pausedByPlatform);
+          },
+          onError: () => {
+            adShowing = false;
+            audio.setTabHidden(document.hidden || portraitLocked || pausedByPlatform);
+          }
+        }
+      });
+    } catch (e) {
+      adShowing = false;
+      audio.setTabHidden(document.hidden || portraitLocked || pausedByPlatform);
+    }
+  }
+
   if (typeof window.YaGames !== "undefined") {
     window.YaGames.init()
       .then((sdk) => {
         ysdk = sdk;
         if (ysdk.features && ysdk.features.LoadingAPI) {
           ysdk.features.LoadingAPI.ready();
+        }
+        if (typeof ysdk.on === "function") {
+          ysdk.on("game_api_pause", () => {
+            pausedByPlatform = true;
+            keys.left = false;
+            keys.right = false;
+            touchLeft = false;
+            touchRight = false;
+            audio.setTabHidden(true);
+          });
+          ysdk.on("game_api_resume", () => {
+            pausedByPlatform = false;
+            if (!adShowing) {
+              audio.setTabHidden(document.hidden || portraitLocked);
+            }
+          });
+        }
+        if (state && (state.mode === "intro" || state.mode === "run")) {
+          setGameplayActive(true);
         }
       })
       .catch(() => {});
@@ -447,6 +511,10 @@
     }
 
     if (state.mode === "gameover" && !state.endedByGoal && !e.repeat) {
+      if (adShowing || pausedByPlatform) {
+        e.preventDefault();
+        return;
+      }
       if (e.code === "Space" || e.code === "Enter" || e.code === "KeyR" || e.code === "KeyA" || e.code === "KeyD" || e.code === "ArrowLeft" || e.code === "ArrowRight") {
         startIntroCutscene();
         e.preventDefault();
@@ -475,7 +543,7 @@
   });
 
   document.addEventListener("visibilitychange", () => {
-    audio.setTabHidden(document.hidden || portraitLocked);
+    audio.setTabHidden(document.hidden || portraitLocked || adShowing || pausedByPlatform);
   });
 
   function syncTouchesFromEvent(e) {
@@ -513,6 +581,10 @@
       return;
     }
     if (state.mode === "gameover" && !state.endedByGoal) {
+      if (adShowing || pausedByPlatform) {
+        e.preventDefault();
+        return;
+      }
       touchLeft = false;
       touchRight = false;
       startIntroCutscene();
@@ -548,6 +620,7 @@
       unlockAudioOnce();
       requestMobileFullscreen();
       e.stopPropagation();
+      if (adShowing || pausedByPlatform) return;
       if (state.mode === "gameover" || state.mode === "end_menu") {
         startIntroCutscene();
       }
@@ -557,6 +630,7 @@
   // Mouse clicks on desktop ONLY unlock audio / restart on gameover — NEVER hijack keyboard steering!
   window.addEventListener("pointerdown", (e) => {
     unlockAudioOnce();
+    if (adShowing || pausedByPlatform) return;
     if (e.pointerType !== "touch" && state.mode === "gameover" && !state.endedByGoal && !portraitLocked) {
       startIntroCutscene();
     }
@@ -645,6 +719,7 @@
 
   function startIntroCutscene() {
     if (crashOverlay) crashOverlay.classList.remove("visible", "ending-complete");
+    setGameplayActive(true);
 
     state.mode = "intro";
     state.x = 0;
@@ -1042,7 +1117,7 @@
   function tick(now) {
     requestAnimationFrame(tick);
 
-    if (portraitLocked) {
+    if (portraitLocked || adShowing || pausedByPlatform) {
       prevTime = now;
       return;
     }
@@ -2050,6 +2125,7 @@
 
         // 6) ~1.40s after the knock starts (`bt = 13.35s -> 14.75s`), immediately start the smooth black cross-fade into the Drone Forest & titles!
         if (bt >= 14.75) {
+          setGameplayActive(false);
           state.blink = 0.0;
           state.screenFade = 1.0;
           state.mode = "end_menu";
@@ -2288,6 +2364,7 @@
             crashOverlay.classList.remove("ending-complete");
             crashOverlay.classList.add("visible");
           }
+          showDeathFullscreenAd();
         }
       } else {
         let bVal = 0.0;
