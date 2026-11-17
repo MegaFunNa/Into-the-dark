@@ -336,7 +336,13 @@
   function applyLanguage() {
     const en = gameLanguage === "en";
     document.documentElement.lang = gameLanguage;
-    document.title = en ? "Into The Dark — VHS Found Footage" : "Into The Dark — Запись на VHS";
+    const title = en ? "Zombies in the Fog" : "Зомби в тумане";
+    document.title = title;
+    const endingTitle = document.getElementById("ending-title");
+    if (endingTitle) {
+      endingTitle.textContent = title.toUpperCase();
+      endingTitle.dataset.text = title.toUpperCase();
+    }
     if (hintEl) hintEl.textContent = isTouchDevice
       ? (en ? "TAP LEFT OR RIGHT TO DODGE | PICK UP FLARE CRATES FOR BATTERIES" : "НАЖИМАЙТЕ НА ЛЕВУЮ ИЛИ ПРАВУЮ СТОРОНУ ЭКРАНА — УКЛОНЯТЬСЯ | ПОДБИРАЙТЕ ЯЩИКИ ДЛЯ БАТАРЕЕК")
       : (en ? "[A / D] OR [← / →] — DODGE | PICK UP FLARE CRATES FOR BATTERIES" : "[A / D] ИЛИ [← / →] — УКЛОНЯТЬСЯ | ПОДБИРАЙТЕ ЯЩИКИ С СИГНАЛЬНОЙ ШАШКОЙ, ЧТОБЫ ПОЛУЧАТЬ БАТАРЕЙКИ");
@@ -419,6 +425,9 @@
     audio.unlock();
   }
 
+  let sevenStreakCount = 0;
+  let lastSevenTime = 0;
+
   const BEST_DIST_KEY = "into_the_dark_best_m";
   function loadBestDistance() {
     try {
@@ -463,8 +472,73 @@
     }
   }
 
+  function warpTo2950() {
+    if (crashOverlay) crashOverlay.classList.remove("visible", "ending-complete");
+    state.mode = "run";
+    setGameplayActive(true);
+    state.endedByGoal = false;
+    state.usedDebugWarp = true;
+    state.debugNoMonsters = true;
+    state.endingHeliPlaced = false;
+    state.endingInBedroom = false;
+    state.endingTime = 0;
+    state.monsterStumbleTimer = 0;
+    endingHeli.visible = false;
+    finaleHordeGroup.visible = false;
+    apartmentBedroom.group.visible = false;
+    introMonster.group.visible = false;
+    deathMonster.group.visible = false;
+    flashlightProp.visible = false;
+    camcorderProp.visible = false;
+    if (camcorderProp.userData && camcorderProp.userData.lcdMat) {
+      camcorderProp.userData.lcdMat.color.setHex(0x12261a);
+    }
+    if (state.battery <= 0.01) {
+      state.battery = 0.65;
+      state.camcorderThrown = false;
+    }
+    if (!state.camcorderThrown && state.battery > 0.001) {
+      state.camcorderOn = true;
+      state.nightVisionOn = true;
+    } else {
+      state.camcorderOn = false;
+      state.nightVisionOn = false;
+    }
+    state.blink = 0;
+    state.screenFade = 0.0;
+    state.trauma = 0;
+    state.horrorGlitch = 0;
+    state.faceGlitchDur = 0;
+    state.distance = 2950;
+    state.z = -2950;
+    state.x = world.roadCenterX(-2950);
+    state.y = world.terrainHeight(state.x, state.z) + EYE_HEIGHT;
+    state.vx = 0;
+    state.speed = MAX_SPEED;
+    world.update(state.x, state.z, 0.016, state.battery, null, true, true);
+    placeFinaleHelicopterAhead();
+  }
+
   window.addEventListener("keydown", (e) => {
     unlockAudioOnce();
+
+    // GitHub demonstration shortcut only. It never changes the player's record.
+    if (!e.repeat && !adShowing && !pausedByPlatform && !portraitLocked) {
+      const isSeven = e.code === "Digit7" || e.code === "Numpad7" || e.key === "7";
+      if (isSeven) {
+        const now = performance.now();
+        if (now - lastSevenTime > 2500) sevenStreakCount = 0;
+        lastSevenTime = now;
+        if (++sevenStreakCount >= 3) {
+          sevenStreakCount = 0;
+          warpTo2950();
+          e.preventDefault();
+          return;
+        }
+      } else {
+        sevenStreakCount = 0;
+      }
+    }
 
     if (state.mode === "gameover" && !state.endedByGoal && !e.repeat) {
       if (adShowing || pausedByPlatform) {
@@ -613,6 +687,8 @@
     vx: 0,
     distance: 0,
     bestDistance: loadBestDistance(),
+    usedDebugWarp: false,
+    debugNoMonsters: false,
     runClock: 0,
     speed: BASE_SPEED,
     stepPhase: 0,
@@ -688,6 +764,8 @@
     state.y = world.terrainHeight(0, 3.5) + EYE_HEIGHT;
     state.vx = 0;
     state.distance = 0;
+    state.usedDebugWarp = false;
+    state.debugNoMonsters = false;
     state.runClock = 0;
     state.speed = 2.5;
     state.stepPhase = 0;
@@ -997,7 +1075,7 @@
     state.mode = "ending";
     state.endedByGoal = true;
     state.distance = GOAL_DISTANCE;
-    if (GOAL_DISTANCE > state.bestDistance) {
+    if (!state.usedDebugWarp && GOAL_DISTANCE > state.bestDistance) {
       state.bestDistance = GOAL_DISTANCE;
       saveBestDistance(GOAL_DISTANCE);
     }
@@ -1506,7 +1584,7 @@
         state.monsterStumbleTimer = Math.max(0, state.monsterStumbleTimer - dt);
       }
 
-      world.update(state.x, state.z, dt, state.battery, triggerHorrorEvent, false, false);
+      world.update(state.x, state.z, dt, state.battery, triggerHorrorEvent, false, state.debugNoMonsters);
 
       state.trauma = Math.max(0, state.trauma - dt * 0.90);
       state.horrorGlitch = Math.max(0, state.horrorGlitch - dt * 1.45);
@@ -2114,7 +2192,7 @@
       state.endMenuTime += dt;
       const et = state.endMenuTime;
 
-      // Pure smooth black fade-in (NO eyelid blink shape!) revealing the drone forest & `INTO THE DARK` titles
+      // Pure smooth black fade-in (NO eyelid blink shape!) revealing the drone forest and localized titles
       state.blink = 0.0;
       state.screenFade = et < 0.25 ? 1.0 : (1.0 - smoothstep01(Math.min(1.0, (et - 0.25) / 5.5)));
       state.camcorderOn = false;
@@ -2313,7 +2391,7 @@
           state.mode = "gameover";
           const runM = Math.max(0, Math.floor(state.distance));
           let isNewRec = false;
-          if (runM > state.bestDistance) {
+          if (!state.usedDebugWarp && runM > state.bestDistance) {
             state.bestDistance = runM;
             saveBestDistance(runM);
             isNewRec = true;

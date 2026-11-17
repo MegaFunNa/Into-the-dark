@@ -116,9 +116,10 @@ html, body {
   position: relative;
   font-family: "Courier New", Courier, monospace;
   font-weight: 700;
-  font-size: clamp(28px, 4.8vw, 58px);
-  letter-spacing: clamp(8px, 1.35vw, 18px);
-  padding-left: clamp(8px, 1.35vw, 18px);
+  font-size: clamp(18px, 3.4vw, 48px);
+  letter-spacing: clamp(2px, 0.55vw, 8px);
+  padding-left: clamp(2px, 0.55vw, 8px);
+  white-space: nowrap;
   color: rgba(224, 232, 228, 0.86);
   text-shadow:
     0 0 18px rgba(150, 175, 195, 0.22),
@@ -131,7 +132,7 @@ html, body {
   content: attr(data-text);
   position: absolute;
   inset: 0;
-  padding-left: clamp(8px, 1.35vw, 18px);
+  padding-left: clamp(2px, 0.55vw, 8px);
   pointer-events: none;
   opacity: 0.42;
 }
